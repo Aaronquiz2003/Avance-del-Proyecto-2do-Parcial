@@ -1,11 +1,11 @@
 from PySide6 import QtGui
 from PySide6.QtGui import QRegularExpressionValidator
-from PySide6.QtWidgets import QMainWindow
-
+from PySide6.QtWidgets import QMainWindow, QMessageBox
 from Datos.estudiante_dao import EstudianteDao
 from UI.vtn_principal import Ui_vtn_principal
 from dominio.docente import Docente
 from dominio.estudiante import Estudiante
+
 class PersonaPrincipal(QMainWindow):
     def __init__(self):
         super(PersonaPrincipal, self).__init__()
@@ -22,57 +22,48 @@ class PersonaPrincipal(QMainWindow):
     def grabar(self):
         tipo_persona = self.ui.cb_tipo_persona.currentText()
         if self.ui.txt_nombre.text() == '' or self.ui.txt_apellido.text() == ''\
-            or len (self.ui.txt_cedula.text()) < 10 or self.ui.txt_email.text() == '':
-            print(' Completar datos')
+            or len(self.ui.txt_cedula.text()) < 10 or self.ui.txt_email.text() == '':
+            QMessageBox.critical(self, 'Error', 'Por favor, complete todos los campos.')
         else:
-         persona = None
-         if tipo_persona == 'Docente':
-            persona = Docente()
+            persona = None
+            if tipo_persona == 'Docente':
+                persona = Docente()
+            else:
+                persona = Estudiante()
+
             persona.nombre = self.ui.txt_nombre.text()
             persona.apellido = self.ui.txt_apellido.text()
             persona.cedula = self.ui.txt_cedula.text()
             persona.email = self.ui.txt_email.text()
-         else:
-            persona = Estudiante()
-            persona.nombre = self.ui.txt_nombre.text()
-            persona.apellido = self.ui.txt_apellido.text()
-            persona.cedula = self.ui.txt_cedula.text()
-            persona.email = self.ui.txt_email.text()
-            #try:
-            #EstudianteDao.insertar_estudiante(persona)
-            #except Exception as e:
+            persona.carrera = self.ui.txt_carrera.text()
+            respuesta=None
+            respuesta= EstudianteDao.insertar_estudiante(persona)
 
+            try:
+                EstudianteDao.insertar_estudiante(persona)  # Asumiendo que EstudianteDao.insertar_estudiante está definido en tu código.
+                self.ui.txt_nombre.setText('')
+                self.ui.txt_apellido.setText('')
+                self.ui.txt_cedula.setText('')
+                self.ui.txt_email.setText('')
+                self.ui.txt_carrera.setText('')
+                self.ui.stb_estado.showMessage('Grabado con éxito.', 2000)
+            except Exception as e:
+                QMessageBox.critical(self, 'Error', f'No se pudo grabar: {str(e)}')
 
+    def buscar_x_cedula(self):
+        cedula = self.ui.txt_consulta_cedula.text()
+        e= Estudiante(cedula=cedula)
+        e=EstudianteDao.seleccionar_por_cedula(e)
+        print(e)
+        self.ui.txt_nombre.setText(e.nombre)
+        self.ui.txt_apellido.setText(e.apellido)
+        self.ui.txt_email.setText(e.email)
+        self.ui.cb_tipo_persona.setCurrentText('Estudiante')
 
+if __name__ == "__main__":
+    import sys
 
-                #insertar
-        #archivo = None
-        #try:
-         #   archivo = open('../servicio/archivo.txt', mode='a')
-          #  archivo.write(persona.__str__())
-           # archivo.write('\n')
-        #except Exception as e:
-            #print('No se pudo grabar.')
-        #finally:
-         #   if archivo:
-          #      archivo.close()
-        #if respuesta['exito']:
-        self.ui.txt_nombre.setText('')
-        self.ui.txt_apellido.setText('')
-        self.ui.txt_cedula.setText('')
-        self.ui.txt_email.setText('')
-        self.ui.stb_estado.showMessage('Grabado con éxito.', 2000)
-        #else:
-        	#QmessageBox.critical(self,'Error',respuesta['mensaje'])
-    def consultar(self):
-        consulta_cedula = self.ui.txt_consulta_cedula.text()
-        self._persona = PersonaPrincipal()
-        self._persona = PersonaPrincipal(cedula=consulta_cedula)
-        tupla_persona = EstudianteDao.seleccionar_persona_por_cedula(self._persona)
-        self._persona.id = tupla_persona[0]
-        self._persona.nombre = tupla_persona[1]
-        self._persona.apellido = tupla_persona[2]
-        self._persona.cedula = tupla_persona[3]
-        self._persona.email = tupla_persona[4]
-        self.llenar_formulario()
-        print(self._persona)
+    app = QApplication(sys.argv)
+    ventana = PersonaPrincipal()
+    ventana.show()
+    sys.exit(app.exec())
