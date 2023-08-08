@@ -1,74 +1,70 @@
-from Datos.conexion import Conexion
+from PySide6 import QtGui
+from PySide6.QtGui import QRegularExpressionValidator
+from PySide6.QtWidgets import QMainWindow, QMessageBox
+from Datos.estudiante_dao import EstudianteDao
+from UI.vtn_principal import Ui_vtn_principal
+from dominio.docente import Docente
 from dominio.estudiante import Estudiante
 
+class PersonaPrincipal(QMainWindow):
+    def __init__(self):
+        super(PersonaPrincipal, self).__init__()
+        self.ui = Ui_vtn_principal()
+        self.ui.setupUi(self)
+        self.ui.stb_estado.showMessage('Bienvenido', 2000)
+        self.ui.vtn_grabar.clicked.connect(self.grabar)
+        self.ui.txt_cedula.setValidator(QtGui.QIntValidator())
 
-class EstudianteDao:
-    _INSERTAR ="insert into Estudiante (cedula,nombre,apellido,email,carrera,activo) values (?,?,?,?,?,?)"
-    _SELECCIONAR_X_CEDULA ="select id,cedula,nombre,apellido,email,carrera,activo from Estudiante where cedula= '3698521470'"
+        correo_exp = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b'
+        validator = QRegularExpressionValidator(correo_exp, self)
+        self.ui.txt_email.setValidator(validator)
 
-    @classmethod
-    def insertar_estudiante(cls, estudiante):
-        respuesta = {"exito": False, "mensaje": ""}
-        flag_exito = False
-        mensaje = ""
-        try:
-            with Conexion.obtenerCursor() as cursor:
-                datos = (
-                estudiante.cedula, estudiante.nombre, estudiante.apellido, estudiante.email, estudiante.carrera,
-                estudiante.activo)
-                cursor.execute(cls._INSERTAR, datos)
-                flag_exito = True
-                mensaje = "INGRESO EXITOSO"
-        except IntegrityError as e:
-            flag_exito = False
-            if e.__str__().find("Cedula") > 0:
-                print("CEDULA YA INGRESADA.")
-                mensaje = "cedula ya ingresada"
-            elif e.__str__().find("Email") > 0:
-                print("EMAIL YA INGRESADA.")
-                mensaje = "email ya ingresada"
+    def grabar(self):
+        tipo_persona = self.ui.cb_tipo_persona.currentText()
+        if self.ui.txt_nombre.text() == '' or self.ui.txt_apellido.text() == ''\
+            or len(self.ui.txt_cedula.text()) < 10 or self.ui.txt_email.text() == '':
+            QMessageBox.critical(self, 'Error', 'Por favor, complete todos los campos.')
+        else:
+            persona = None
+            if tipo_persona == 'Docente':
+                persona = Docente()
             else:
-                print("ERROR DE INTEGRIDAD")
-                mensaje = "Error de integridad"
-        except ProgrammingError as e:
-            flag_exito = False
-            print("Los datos Ingresados no son del tamaño permitido")
-            mensaje = "Los datos Ingresados no son del tamaño permitido"
-        except Exception as e:
-            flag_exito = False
-            print(e)
-        finally:
-            respuesta["exito"] = flag_exito
-            respuesta["mensaje"] = mensaje
-            return respuesta
+                persona = Estudiante()
 
-    @classmethod
-    def seleccionar_por_cedula(cls,estudiante):
-        persona_encontrada= None
-        try:
-         with Conexion.obtenerConexion() as cursor:
-             datos= (estudiante.cedula)
-             resultado=cursor.execute(cls._SELECCIONAR_X_CEDULA,datos)
-             persona_encontrada=resultado.fetchone()
-             estudiante.email=persona_encontrada[4]
-             estudiante.nombre=persona_encontrada[2]
-             estudiante.apellido=persona_encontrada[3]
-             estudiante.carrera=persona_encontrada[5]
-             estudiante.activo = persona_encontrada[6]
-        except Exception as e:
-            print(e)
-        finally:
-            return estudiante
+            persona.nombre = self.ui.txt_nombre.text()
+            persona.apellido = self.ui.txt_apellido.text()
+            persona.cedula = self.ui.txt_cedula.text()
+            persona.email = self.ui.txt_email.text()
+            persona.carrera = self.ui.txt_carrera.text()
+            respuesta=None
+            respuesta= EstudianteDao.insertar_estudiante(persona)
 
+            try:
+                EstudianteDao.insertar_estudiante(persona)  # Asumiendo que EstudianteDao.insertar_estudiante está definido en tu código.
+                self.ui.txt_nombre.setText('')
+                self.ui.txt_apellido.setText('')
+                self.ui.txt_cedula.setText('')
+                self.ui.txt_email.setText('')
+                self.ui.txt_carrera.setText('')
+                self.ui.stb_estado.showMessage('Grabado con éxito.', 2000)
+            except Exception as e:
+                QMessageBox.critical(self, 'Error', f'No se pudo grabar: {str(e)}')
 
-if __name__=='__main__':
-    e1= Estudiante()
-    e1.cedula='0123456789'
-    e1.nombre='Juan'
-    e1.apellido='Cruz'
-    e1.email='jceuz@gmail.com'
-    e1.carrera='ADN'
-    e1.activo= True
-    #EstudianteDao.insertar_estudiante(e1)
-    persona_encontrada =EstudianteDao.seleccionar_por_cedula(e1)
-    print(persona_encontrada)
+    def buscar_x_cedula(self):
+        cedula = self.ui.txt_consulta_cedula.text()
+        e= Estudiante(cedula=cedula)
+        e=EstudianteDao.seleccionar_por_cedula(e)
+        print(e)
+        self.ui.txt_nombre.setText(e.nombre)
+        self.ui.txt_apellido.setText(e.apellido)
+        self.ui.txt_email.setText(e.email)
+        self.ui.cb_tipo_persona.setCurrentText('Estudiante')
+
+if __name__ == "__main__":
+    import sys
+
+    app = QApplication(sys.argv)
+    ventana = PersonaPrincipal()
+    ventana.show()
+    sys.exit(app.exec())
+
